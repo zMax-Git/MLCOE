@@ -1,0 +1,406 @@
+\documentclass{article}
+\usepackage{cite}
+% \usepackage[dvipdfmx]{graphicx} 
+% \usepackage{bmpsize}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage[colorlinks,linkcolor=blue]{hyperref}
+\usepackage{float}
+\usepackage{amsmath}
+\usepackage{subfigure}
+\usepackage{pdfpages}
+\usepackage[font=small,labelfont=bf]{caption}
+\usepackage{geometry}
+\usepackage{appendix}
+\usepackage{makecell}   
+\usepackage{siunitx}
+\usepackage{listings}
+\usepackage{color}
+\begin{document}
+\title{Monthly Report}
+\author{Jiajia HUANG}
+\maketitle
+\tableofcontents
+
+\section{Linear-Gaussian SSM with Kalman Filter}
+\subsection{Linear-Gaussian State Space Model}
+We first set up a contex for the problem. Assume a system is an object moving with constant velocity. The state of a 2D system is $X_n = [x_n, y_n, v_{xn}, v_{yn}]^T$, and the observation is a 2D vector $Y_n = [x_n^{obs}, y_n^{obs}]^T$. Assume we have a noise $V_n$ that acts on velocity $v_{xn}, v_{yn}$ and $W_n$ that acts on measurement $\hat{x}_n, \hat{y}_n$ respectively. This means that:
+
+\begin{equation}
+    x_n = x_{n-1} + v_{xn} * \Delta t 
+\end{equation}
+\begin{equation}
+    y_n = y_{n-1} + v_{yn} * \Delta t 
+\end{equation}
+\begin{equation}
+    v_{xn} = v_{xn-1} + V_{n} 
+\end{equation}
+\begin{equation}
+    v_{yn} = v_{yn-1} + V_{n} 
+\end{equation}
+
+\begin{equation}
+    x_n^{obs} = x_n + W_n
+\end{equation}
+\begin{equation}
+    y_n^{obs} = y_n + W_n
+\end{equation}
+
+
+This setting lives up to a linear Gaussian state space model:
+
+\begin{equation}
+    X_n = A * X_{n-1} + B * V_n
+    \label{eq:state-equation}
+\end{equation}
+\begin{equation}
+    Y_n = C * X_n + D * W_n
+    \label{eq:observation-equation}
+\end{equation}
+
+Where $V_n \sim N(0, I)$ and $W_n \sim N(0, I)$. The state transition matrix is $A = \begin{bmatrix} 1 & 0 & \Delta t & 0 \\ 0 & 1 & 0 & \Delta t \\ 0 & 0 & 1 & 0 \\ 0 & 0 & 0 & 1 \end{bmatrix}$, $\Delta t$ is the time step. The process noise matrix is $B = b * \begin{bmatrix} 0 & 0 & 0 & 0 \\ 0 & 0 & 0 & 0 \\ 0 & 0 & 1 & 0 \\ 0 & 0 & 0 & 1 \end{bmatrix}$, b is a scaling factor. The observation matrix is $C = \begin{bmatrix} 1 & 0 & 0 & 0 \\ 0 & 1 & 0 & 0 \end{bmatrix}$. The observation noise matrix is $D = d * \begin{bmatrix} 1 & 0 \\ 0 & 1 \end{bmatrix}$, d is a scaling factor.  The initial state is $X_0 \sim N(0, \Sigma)$:
+
+\subsection{Kalman Filter}
+% \subsection{Theoretical Background}
+Assume that we now only have the observation $Y_n$ data, and we know A, B, C, D, $\Sigma_0$, we can use Kalman Filter to estimate the hidden state $X_n$. In the following, we will use the notation $\hat{X}_{n|n}$ to denote the filtered mean and $\hat{P}_{n|n}$ to denote the filtered covariance.
+
+Kalman Filter can be seen as the optimal weighting of two Gaussian processes, predition process and observation process. It first predicts the prior from the previous state variable (=prediction) and calculates the likelihood when the observation value is given, then finds the posterior pdf according to the Bayesian rule (=correction). In one iteration of the Kalman recursion, the filtered means/covariances are updated by the following equation:
+
+\begin{equation}
+\begin{aligned}
+    & \hat{X}_{n-1 \mid n-1} \xrightarrow{\text { Prediction }} \hat{X}_{n \mid n-1} \xrightarrow{\text { Correction }} \hat{X}_{n \mid n} \\
+    & \hat{P}_{n-1 \mid n-1} \xrightarrow{\text { Prediction }} \hat{P}_{n \mid n-1} \xrightarrow{\text { Correction }} \hat{P}_{n \mid n}
+    \end{aligned}
+\end{equation}
+
+In prediction step, the predicted mean and covariance are updated by the following equation:
+\begin{equation}
+    \hat{X}_{n|n-1} = A * \hat{X}_{n-1|n-1}
+\end{equation}
+\begin{equation}
+    \hat{P}_{n|n-1} = A * \hat{P}_{n-1|n-1} * A^T + B * B^T
+\end{equation}
+
+In correction step, we use the information from the observation $Y_t$ to update the filtered mean and covariance by the following equation:
+\begin{equation}
+    \hat{X}_{n|n} = \hat{X}_{n|n-1} + K_n * (Y_n - C * \hat{X}_{n|n-1})
+    \label{eq:correction}
+\end{equation}
+Here the Kalman gain $K_n $ is introduced. Then we can have (see Appendix for derivation): 
+\begin{equation}
+    \hat{P}_{n|n} = (I - K_n * C) * \hat{P}_{n|n-1} * (I - K_n * C)^T + K_n * D * D^T * K_n^T
+    \label{eq:correction-covariance}
+\end{equation}
+
+% Where
+% \begin{equation}
+%     X_{t|t} = X_{t|t-1} + K_t * (Y_t - C * X_{t|t-1})
+% \end{equation}
+
+In principle, \eqref{eq:correction} and \eqref{eq:correction-covariance} are valid with any form of $K_n$. However, in practice, we want to find the optimal $K_n$ that minimizes the error between the filtered mean and the true mean. This optimal $K_n$ is given by the following equation\cite{}%:
+
+\begin{equation}
+    K_n = \hat{P}_{n|n-1} * C^T * (C * \hat{P}_{n|n-1} * C^T +  D * D^T)^{-1}
+    \label{eq:kalman-gain}
+\end{equation}
+
+Using \eqref{eq:kalman-gain}, \eqref{eq:correction-covariance} can be rewritten as:
+\begin{equation}
+    \hat{P}_{n|n} = (I - K_n * C) * \hat{P}_{n|n-1}
+    \label{eq:correction-covariance-2}
+\end{equation}
+
+
+
+Eq. \eqref{eq:correction-covariance-2} is the standard covariance update equation, while Eq. \eqref{eq:correction-covariance} is the Joseph stabilized covariance update equation. 
+
+Known that the initial state is $X_0 \sim N(0, \Sigma)$. In calculation, we use $X_0=[0, 0, 0, 0]^T$ and $P_0=\Sigma$ to initialize the filter.
+
+ 
+% we also randomly draw a state from the prior $N(0, \Sigma_{init})$ to initialize the filter. In this case, the initial covariance matrix is $P_0 = \Sigma_{init} $. 
+
+
+\subsection{Results and Discussion}
+% 由于在正态分布假设下，真实值有约 95\% 的概率落在 均值 ± 1.96 x 标准差 的区间内，因此我们可以用这个区间来估计真实值的置信区间。
+Figure \ref{fig:kalman} shows the Kalman Filter for Position X and Y. The blue shaded area is the 95\% confidence interval, which is calculated as the $x_{pred}$ ± 1.96 * $\sqrt{P_{pred}}$. Within this confidence interval, the filtered trajectory(blue line) is close to the ground truth trajectory(black line).
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=0.5\textwidth]{Q1/noise-magnitide/Kalman-b-0.5-d-10.0.png}
+        \caption{Kalman Filter for Position X and Y. \label{fig:kalman}}
+    \end{figure}
+
+
+\subsubsection{Compare filtered means/covariances to the Kalman recursion}
+This question asks us to compare the filtered means/covariances to the Kalman recursion. The filtered means/covariances are the estimated state/covariance of the system at the current time step, while the Kalman recursion is the process of updating the state/covariance of the system at the current time step based on the observation.
+
+Fig. \ref{fig:kalman-2}(a) shows the Kalman filtered means/covariances to the Kalman recursion. The True state (Black) follows a complex, wave-like path. The Observations (Red dots) are noisy.
+The KF Estimate (Blue line) successfully smooths the red dots. It doesn't chase every single noisy measurement, resulting in a path that is much closer to the Black line than the observation red dots. At the end of the simulation ($t > 175$), the trajectory drops rapidly. The filter tracks this sudden change in velocity quite well, showing that it is responsive and not "stuck" in its previous motion model.
+
+
+In Fig. \ref{fig:kalman-2}(b), the error of $X_{n|n}$ is always closer to the x-axis than $X_{n|n-1}$, and the error covariance (blue line) in \ref{fig:kalman-2}(c) is always lower than the prior covariance (green line). This visually demonstrates the core principle of the Kalman filter: after correction based on the observed data, the uncertainty of the estimation is reduced.
+
+
+The red line in \ref{fig:kalman-2}(c) is the $K_n$ gain. One can always rewrite eq.\eqref{eq:correction} as:
+
+\begin{equation}
+    \hat{X}_{n|n} = K_n * Y_n + (I - K_n * C) * \hat{X}_{n|n-1}
+    \label{eq:correction-2}
+\end{equation}
+This means that $K_n$ actually determines how much the filter believes in the observation $Y_n$ (the red dots in (a)) and how much it believes in the predicted state $\hat{X}_{n|n-1}$ (the green line in (a)) when updating the state.
+
+In the first few steps (from time 0 to 20), the $K_n$ rises sharply and then drops, which is called the convergence process. The filter is rapidly adjusting to adapt to the environment. After that, $K_n$ becomes a horizontal line, means the system has entered the steady state. As long as the noise characteristics of the system (process noise B and measurement noise D) remain unchanged, the gain will remain constant.
+
+
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{Q1/Fielter-means-covariances/Kalman-b-0.5-d-50.0-2.png}
+    \caption{Kalman Filter for Position X and Y. \label{fig:kalman-2}}
+\end{figure}
+
+\subsubsection{Joseph stabilized covariance and Conditioning number}
+
+Although mathematically equivalent, the standard form \eqref{eq:correction-covariance-2} and the Joseph stabilized form \eqref{eq:correction-covariance} for covariance update exhibit different numerical properties in finite-precision arithmetic. The standard update $P_{n|n} = (I - K_n C) P_{n|n-1}$ suffers from two main numerical issues:
+
+\begin{enumerate}
+    \item \textbf{Loss of symmetry}: Due to floating-point roundoff errors, the computed covariance matrix may not be exactly symmetric, i.e., $P_{n|n} \neq P_{n|n}^T$. This asymmetry can accumulate over time and lead to numerical instabilities.
+    
+    \item \textbf{Loss of positive definiteness}: The standard form does not guarantee that the updated covariance matrix remains positive definite. In extreme cases (e.g., very small measurement noise, large initial uncertainty, or long time horizons), numerical errors can cause the matrix to lose positive definiteness, resulting in negative eigenvalues.
+\end{enumerate}
+
+The Joseph stabilized form explicitly maintains both symmetry and positive definiteness:
+\begin{equation}
+    P_{n|n} = (I - K_n C) P_{n|n-1} (I - K_n C)^T + K_n R K_n^T
+    \label{eq:joseph-form}
+\end{equation}
+where $R = D D^T$ is the measurement noise covariance. The term $K_n R K_n^T$ is always positive semi-definite, ensuring that $P_{n|n}$ remains positive definite even in the presence of numerical errors. Additionally, the explicit symmetric form $(I - K_n C) P_{n|n-1} (I - K_n C)^T$ preserves symmetry by construction.
+
+The \textbf{condition number} of a matrix measures how sensitive the solution is to perturbations in the input data and to roundoff errors made during the solution process. For a covariance matrix $P$, the condition number is defined as:
+\begin{equation}
+    \kappa(P) = \frac{\lambda_{\max}(P)}{\lambda_{\min}(P)}
+\end{equation}
+where $\lambda_{\max}$ and $\lambda_{\min}$ are the maximum and minimum eigenvalues of $P$, respectively. A large condition number (e.g., $\kappa > 10^{12}$) indicates that the matrix is ill-conditioned, making numerical computations unreliable. 
+
+In the context of Kalman filtering, ill-conditioned covariance matrices can arise when:
+\begin{itemize}
+    \item The measurement noise is very small relative to the process noise ($d \ll b$), leading to large Kalman gains
+    \item The initial uncertainty is very large ($\sigma_0 \gg 1$)
+    \item The filter runs for a long time, allowing numerical errors to accumulate
+\end{itemize}
+
+To demonstrate the numerical differences, we compare both methods using single-precision floating-point arithmetic (float32) with extreme parameters: $\sigma_0 = 1000$, $b = 0.5$, $d = 0.01$, and $T = 1000$ time steps. Figure \ref{fig:joseph-comparison} shows that:
+
+\begin{itemize}
+    \item The standard method exhibits larger symmetry errors ($||P - P^T||_F$) compared to the Joseph method
+    \item The standard method may lose positive definiteness (negative minimum eigenvalues), while the Joseph method maintains positive definiteness throughout
+    \item Both methods show similar condition numbers, but the Joseph method provides better numerical stability
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{Q1/Joseph-cov/Joseph-cov-comparison.png}
+    \caption{Comparison of Standard and Joseph stabilized covariance update methods. (a) Symmetry error over time, (b) Minimum eigenvalue (positive definiteness check), (c) Condition number, (d) State estimates comparison. \label{fig:joseph-comparison}}
+\end{figure}
+
+In practice, the Joseph stabilized form is recommended for applications requiring long-term stability, especially when using single-precision arithmetic or when the system parameters lead to ill-conditioned covariance matrices.
+
+
+\section{Nonlinear/Non-Gaussian SSM with EKF/UKF and Particle Filter}
+\subsection{Model Description: Stochastic Volatility}
+% 波动率是收益率的条件标准差。 设是某种资产在时刻的基于某时间单位（如天、月、年）的对数收益率， 一般认为序列是前后不相关的， 或者是低阶相关的， 表现为其ACF基本都在零上下的界限内波动， 或者仅前一两个略超出界限。 但是，序列一般也不是前后独立的。（(Tsay 2013. 4.1)。  autoregressive (AR) model 。一元波动率模型就是试图刻画收益率这种本身不相关或低阶自相关但是不独立的性质。
+
+% https://www.math.pku.edu.cn/teachers/lidf/course/fts/ftsnotes/html/_ftsnotes/fts-volamodintro.html#%E4%B8%8B%E8%BD%BD
+
+We use the Stochastic Volatility(SV) Model in example 4 in [Doucet(09)]. This is similar to the classic Taylor (1986) Stochastic Volatility model\cite{taylor2008modelling}\cite{harvey1994multivariate}\cite{TsayRS2013}, a discrete-time state space framework designed to capture the changing variance of financial returns. It assumes that observed asset returns ($Y_n$) are conditionally normal but driven by a latent, mean-reverting autoregressive (AR) process ($X_n$) representing log-volatility. 
+%The model relies on the assumptions that the volatility process is stationary ($|\alpha| < 1$), the return and volatility shocks are independent standard normal variables, and the resulting unconditional distribution of returns exhibits fat tails (leptokurtosis) typical of financial markets.
+
+Here is the whole logic of the SV model in example 4 in [Doucet(09)]: Assume that in the n th moment, the volatility (the standard deviation of $Y_n$) is $s_n$ and $Y_n \sim N(0, s_n^2)$. Therefore 
+\begin{equation}
+    Y_n = s_n * W_n \in R
+    \label{eq:observation-equation-sv-0}
+\end{equation}
+Where $W_n \sim N(0, 1)$. Now define a new variable $X_n$ as the corresponding log-variance of the rate of return:
+
+\begin{equation}
+    X_n = \log(\frac{s_n}{\beta})^2 \in R
+\end{equation}
+With $\beta$ being the Baseline Volatility Level. Assume that $X_n$ follows the following AR(1) process:
+\begin{equation}
+    X_n = \alpha * X_{n-1} + \sigma * V_n
+    \label{eq:state-equation-sv}
+\end{equation}
+where $V_n \sim N(0, 1)$ is the noise term. $\alpha$ is a scaling factor, determining how much current log-variance is affected by the previous log-variance. $\alpha$ is typically close to 1 but less than 1, indicating that the log-variance is highly persistent and the volatility process is stationary. 
+
+On the other hand, Eq.\eqref{eq:observation-equation-sv-0} can be formulated as:
+\begin{equation}
+    Y_n = \beta * \exp(X_n/2) * W_n 
+    \label{eq:observation-equation-sv}
+\end{equation}
+Eq.\eqref{eq:observation-equation-sv} and eq.\eqref{eq:state-equation-sv} are the complete form of the SV model in example 4 in [Doucet(09)]. $\alpha = 0.91$,  $\sigma = 1.0$ and $\beta = 0.5$ in this example. The initial state is $X_0 \sim N(0, \frac{\sigma^2}{1-\alpha^2})$, making sure that we begin with a stationary state($Var(X_n) = Var(X_{n-1})$), the marginal distribution of all $X_n$ is the same.
+
+In application, we can use the SV model to estimate the volatility of the asset price. By accurately estimating the current hidden volatility state through filtering, we can leverage the persistence of volatility to forecast future volatility levels and, consequently, the distribution of future returns for risk assessment. 
+Because the nonlinear/non-Gaussian nature of the SV model, we need to use nonlinear filters like EKF or UKF to estimate the state and covariance. 
+
+
+% Due to the fact that the rate of return has the nature of being uncorrelated(or having low-order autocorrelation) but not being independent. The SV model assumes that the evolution of the log-variance of the asset price $X_n$ follows the autoregressive (AR) process:
+
+% \begin{equation}
+%     \begin{aligned}
+%     X_n &= \alpha * X_{n-1} + \sigma * V_n 
+%     \label{eq:state-equation-sv}
+%     \end{aligned}
+% \end{equation}
+
+% where $V_n \sim N(0, 1)$ is the noise term. $\alpha$ is a scaling factor, determining how much current log-variance is affected by the previous log-variance. $\alpha$ is typically close to 1 but less than 1, indicating that the log-variance is highly persistent and the volatility process is stationary. Here we use 
+
+
+% The SV model holds that the Log Return $Y_n$ is generated by scaling through a potential random volatility process:
+% \begin{equation}
+%     \begin{aligned}
+%     Y_n &= \beta * s_n * W_n \\
+%     &= \beta * \exp(X_{n}/2) * W_n 
+%     \label{eq:observation-equation-sv}
+%     \end{aligned}
+% \end{equation}
+
+% Here $W_n \sim N(0, 1)$ is the noise term. $\beta$ is a scaling factor constant.  When $X_n$ is in the avarage value of 0, $Y_n = \beta * W_n = std(Y_n)$, therefore $\beta$ can also be regarded as the Baseline Volatility Level, determining the "magnitude" of the fluctuation. Let $X_1 \sim N(0, \frac{\sigma^2}{1-\alpha^2})$ be the initial log-variance, therefore $X_n|X_{n-1} \sim N(\alpha * X_{n-1}, \sigma^2)$. In this case, $Y_n|X_n \sim N(0, \beta^2 * \exp(X_{n}))$.
+
+\subsection{Extend Kalman filter (EKF) and linearization accuracy limits}
+
+ Basically, what EKF\cite{2025ExtendedKalmanFilter} do is using the first-order Taylor approximation to approximate the non-linear model to a linear model before applying the Kalman filter. Since the observation noise in eq.\eqref{eq:observation-equation-sv} is multiplicative, directly linearizing $Y_n$ will directly lead to the disappearance of the observed information. We can use the log-transformation to linearize the observation equation:
+ \begin{equation}
+    \begin{aligned}
+    \log(Y_n^2 ) = X_n +\log(\beta^2) + \log(W_n^2) 
+    \end{aligned}
+    \label{eq:observation-equation-sv-log}
+ \end{equation}
+
+Taking $\log(Y_n^2 )$ as the observation, linearly related to $X_n$. $\log(W_n^2) $ is the noise. We can now use the Kalman filter to estimate the state $X_n$ under observation equation\eqref{eq:observation-equation-sv-log} and state equation\eqref{eq:state-equation-sv}. In the prediction step:
+\begin{equation}
+    \begin{aligned}
+    \hat{X}_{n|n-1} = \alpha * \hat{X}_{n-1|n-1}
+    \end{aligned}
+\end{equation}
+\begin{equation}
+    \begin{aligned}
+    \hat{P}_{n|n-1} = \alpha^2 * \hat{P}_{n-1|n-1} + \sigma^2
+    \end{aligned}
+\end{equation}
+
+In the correction step:
+\begin{equation}
+    \begin{aligned}
+    \hat{X}_{n|n} = \hat{X}_{n|n-1} + K_n * (  \log(Y_n^2 ) - E[\log(Y_n^2 )|\hat{X}_{n|n-1}] )
+    \end{aligned}
+    \label{eq:correction-equation-sv-ekf}
+\end{equation}
+\begin{equation}
+    \begin{aligned}
+    \hat{P}_{n|n} = (I - K_n) * \hat{P}_{n|n-1}
+    \end{aligned}
+\end{equation}
+
+
+Here 
+\begin{equation}
+    \begin{aligned}
+    E[\log(Y_n^2 )|\hat{X}_{n|n-1}] &= \hat{X}_{n|n-1} +  \log(\beta^2) + E[\log(W_n^2)] \\
+    &=  \hat{X}_{n|n-1} + \log(\beta^2) - 2\int_{0}^{\infty} \log(w^2) * \frac{1}{\sqrt{2\pi}} * e^{\frac{-w^2}{2}} dw \\
+    &=  \hat{X}_{n|n-1} + \log(\beta^2) - 1.27\
+    \end{aligned}
+\end{equation}
+
+For the kalman gain $K_n$, we still use the same equation(eq.\eqref{eq:kalman-gain}) as in the Kalman filter. $C$ is now the Jacobian matrix of $\log(Y_n^2 )$ with respect to $X_n$, which is I. And $D*D^T$ now is the variance of $\log(W_n^2)= \pi^2 / 2 $\cite{harvey1994multivariate}\cite{abramowitz1964handbook}:
+\begin{equation}
+    \begin{aligned}
+    K_n = \hat{P}_{n|n-1} / ( \hat{P}_{n|n-1} + \pi^2 / 2)
+    \end{aligned}
+\end{equation}
+
+But it should be noted that the kalman gain $K_n$ now is not the minimum mean square error gain, because the observation noise$\log(W_n^2)$ is not Gaussian.
+
+\subsubsection{Results and discussion}
+Figure \ref{fig:sv-ekf} shows the results of the EKF for the SV model. The upper plot shows that in SV model, the volatility of the asset price is bursts out in a concentrated manner, but it will eventually return to normal level. The lower plot shows the estimated volatility(red line) and the true volatility(blue line). We can see that when the true volatility(blue line) suddenly increase or decrease large, the estimated volatility(red line) will not be able to catch up. 
+
+
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{Q2/extend-Kalman.png}
+    \caption{Results of the EKF for the SV model. The red dots marks the extreme points at T=55 and T=189.}
+    \label{fig:sv-ekf}
+\end{figure}
+
+
+%  2. Using the Box-Cox transformation to linearize the observation equation:
+%  \begin{equation}
+    
+%  \end{equation}
+EKF's imperfect performance lies in the linearization accuracy limits, which manifest in several critical ways:
+
+\textbf{1. Non-Gaussian Noise Distribution:} The fundamental limitation lies in the fact that the observation noise $\log(W_n^2)$ is not Gaussian. Actually, $\log(W_n^2)$ follows a $\chi^2_1$ distribution, which exhibits a heavy left tail. While the EKF assumes it to be $\mathcal{N}(-1.27, \pi^2 / 2)$ based on matching the first two moments, this Gaussian approximation fails to capture the true distribution's characteristics. The heavy-tailed nature means that extreme negative values occur more frequently than a Gaussian distribution would predict. When large observation noise is present, the EKF will be overconfident and the state estimate will be lag(eg. T=189 at figure \ref{fig:sv-ekf}). 
+
+\textbf{2. Log-Transformation Amplification:} The log-transformation approach, while necessary to linearize the multiplicative observation equation, introduces additional problems. When $Y_n$ is close to zero, the transformation $\log(Y_n^2 + \epsilon)$ produces extreme negative values, creating outliers that dominate the filter's update in eq.\eqref{eq:correction-equation-sv-ekf}. This means that if there happen to be some small observations in the true data, the filter will transforme them into extreme values and overreact these events(eg. T=55 at figure \ref{fig:sv-ekf}). 
+
+
+
+\textbf{3. Moment Matching vs. Distribution Matching:} The EKF approach matches only the first two moments (mean and variance) of $\log(W_n^2)$ with a Gaussian distribution. However, the $\chi^2_1$ distribution has significant skewness and kurtosis that are ignored. This moment-matching approach works well when the true distribution is approximately Gaussian, but breaks down when the distribution is highly non-Gaussian, as in this case.
+
+
+
+
+\textbf{4. First-Order Approximation Error:} Here we didn't use the traditional way to implement the EKF, but we still briefly discuss the first-order approximation error. Traditonally, the EKF relies on first-order Taylor expansion around the predicted state. For the SV model, the observation function $h(X_n) = \beta \exp(X_n/2)$ has a Jacobian that depends exponentially on the state. When the state uncertainty is large or the state deviates significantly from the linearization point, the first-order approximation becomes inaccurate. 
+
+
+\subsection{Unsent Kalman Filter(UKF) and sigma point failures}     
+It is easier to approximate a probability distribution than it is to approximate an arbitrary nonlinear function.
+
+
+
+
+\appendix
+\section{Appendix}
+\subsection{Derivation of Covariance Update Equation for Kalman Filter}
+We want to derive $P_{n \mid n}$ from $P_{n \mid n-1}$ and $K_n$. By defination of $P_{n \mid n}$, we have
+\begin{equation}
+    P_{n \mid n} = \operatorname{cov}\left\{X_n-\hat{X}_{n \mid n}\right\}
+\end{equation}
+By taking \eqref{eq:correction} to replace $X_{n|n}$, we have:
+
+\begin{equation}
+    P_{n \mid n} =\operatorname{cov}\left\{X_n-\left(\hat{X}_{n \mid n-1}+K_n\left(Y_n-C \hat{X}_{n \mid n-1}\right)\right)\right\}
+\end{equation}
+Then plugging in eq.\eqref{eq:observation-equation} to replace $Y_n$, we have:
+\begin{equation}
+    \begin{aligned}
+    P_{n \mid n} &=\operatorname{cov}\left\{X_n-\left(\hat{X}_{n \mid n-1}+K_n\left(C * X_n+D * W_n-C * \hat{X}_{n \mid n-1}\right)\right)\right\}\\
+    &=\operatorname{cov}\left\{(I - K_n * C) * (X_n - \hat{X}_{n \mid n-1}) + K_n * D * W_n\right\}\\
+    &=\operatorname{cov}\left\{(I - K_n * C) * (X_n - \hat{X}_{n \mid n-1})\right\} + \operatorname{cov}\left\{K_n * D * W_n\right\}\\
+    &=(I - K_n * C) * \operatorname{cov}\left\{(X_n - \hat{X}_{n \mid n-1})\right\} * (I - K_n * C)^T + K_n * D * D^T * K_n^T\\
+    &=(I - K_n * C) * \hat{P}_{n \mid n-1} * (I - K_n * C)^T + K_n * D * D^T * K_n^T\\
+    \end{aligned}
+\end{equation}
+This is the same as eq.\eqref{eq:correction-covariance}.
+
+\subsection{Optimal Kalman Gain}
+
+The Kalman filter is a minimum mean square error estimator, which means that we want to minize E[$(X_n - \hat{X}_{n \mid n})^2$], which is exactly the trace of $P_{n \mid n}$.
+
+Expanding Eq.\eqref{eq:correction-covariance} :
+
+\begin{equation}
+    \begin{aligned}
+    P_{n \mid n} = P_{n|n-1} - K_n * C * P_{n|n-1} - P_{n|n-1} * C^T * K_n^T + K_n * (C * C^T + D * D^T) * K_n^T
+    \end{aligned}
+\end{equation}
+ 
+Taking the derivative of the trace of $P_{n \mid n}$ with respect to $K_n$ and setting it to 0, we get:
+\begin{equation}
+    \frac{\partial \operatorname{tr}(P_{n \mid n})}{\partial K_n} = -2 * C * P_{n|n-1} + 2 * (C * C^T + D * D^T) * K_n = 0
+\end{equation}
+ 
+Here we use the property: $\frac{\partial \operatorname{tr}(BAC)}{\partial A} = B^T C^T$ and $\frac{\partial \operatorname{tr}(AB)}{\partial A} = B^T$. Solving for $K_n$, we get the same result as eq.\eqref{eq:kalman-gain}.
+
+\bibliographystyle{unsrt}
+\bibliography{ref-particle-fielter.bib}
+\end{document}

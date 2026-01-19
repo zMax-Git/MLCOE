@@ -1,0 +1,28 @@
+\begin{thebibliography}{1}
+
+\bibitem{taylor2008modelling}
+Stephen~J Taylor.
+\newblock {\em Modelling financial time series}.
+\newblock world scientific, 2008.
+
+\bibitem{harvey1994multivariate}
+Andrew Harvey, Esther Ruiz, and Neil Shephard.
+\newblock Multivariate stochastic variance models.
+\newblock {\em The Review of Economic Studies}, 61(2):247--264, 1994.
+
+\bibitem{TsayRS2013}
+Tsay, {{R}}.{{S}}. (2013) {{Multivariate Time Series Analysis With R}} and
+  {{Financial Applications}}. {{Wiley}}, {{Hoboken}}. - {{References}} -
+  {{Scientific Research Publishing}}.
+\newblock https://www.scirp.org/reference/referencespapers?referenceid=2289642.
+
+\bibitem{2025ExtendedKalmanFilter}
+Extended {{Kalman}} filter.
+\newblock {\em Wikipedia}, November 2025.
+
+\bibitem{abramowitz1964handbook}
+Milton Abramowitz.
+\newblock Handbook of mathematical functions, national bureau of standards.
+\newblock {\em Applied Mathematics Series}, (55), 1964.
+
+\end{thebibliography}
